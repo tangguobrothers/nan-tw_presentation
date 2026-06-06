@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>全自動免填檔名隨機播放器</title>
+    <title>全自動隨機圖片播放器 (含預讀取功能)</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -27,91 +27,127 @@
         #img-name { margin-right: 15px; color: #aaa; }
         #counter { color: #ff9800; font-weight: bold; }
         #loading { font-size: 18px; color: #888; }
+        
+        /* 隱藏的預讀取容器，不影響畫面視覺 */
+        #preload-container {
+            display: none;
+            width: 0; height: 0; overflow: hidden;
+        }
     </style>
 </head>
 <body>
 
     <div id="viewer">
-        <div id="loading">正在自動掃描 img 資料夾內的所有圖片...</div>
+        <div id="loading">正在自動載入圖片清單...</div>
         <img id="main-image" src="" alt="圖片載入中...">
+        
         <div id="status-bar" style="display: none;">
             <span id="img-name">載入中...</span>
             <span id="counter"><span id="current-index">0</span> / <span id="total-count">0</span></span>
         </div>
     </div>
 
-<script>
-    const IMG_DIR = './img/';
-    let imageFiles = [];
-    let currentIndex = 0;
+    <div id="preload-container"></div>
 
-    const mainImage = document.getElementById('main-image');
-    const imgNameSpan = document.getElementById('img-name');
-    const currentIndexSpan = document.getElementById('current-index');
-    const totalCountSpan = document.getElementById('total-count');
-    const loadingDiv = document.getElementById('loading');
-    const statusBar = document.getElementById('status-bar');
+    <script>
+        const IMG_DIR = './img/';
+        let imageFiles = [];
+        let currentIndex = 0;
 
-    function shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-    }
+        const mainImage = document.getElementById('main-image');
+        const imgNameSpan = document.getElementById('img-name');
+        const currentIndexSpan = document.getElementById('current-index');
+        const totalCountSpan = document.getElementById('total-count');
+        const loadingDiv = document.getElementById('loading');
+        const statusBar = document.getElementById('status-bar');
+        const preloadContainer = document.getElementById('preload-container');
 
-    function displayImage(index) {
-        if (imageFiles.length === 0) return;
-        const imgData = imageFiles[index];
-        mainImage.src = imgData.url;
-        imgNameSpan.textContent = imgData.name;
-        currentIndexSpan.textContent = index + 1;
-        totalCountSpan.textContent = imageFiles.length;
-    }
-
-    // 🔥 改成讀取剛剛生成的 images.json，這在 GitHub Pages 上 100% 合法且不會 404
-    async function loadImagesFromJSON() {
-        try {
-            const response = await fetch('./images.json');
-            if (!response.ok) throw new Error('找不到 images.json 檔案');
-            
-            const filenames = await response.json();
-            
-            imageFiles = filenames.map(name => ({
-                name: name,
-                url: `${IMG_DIR}${name}`
-            }));
-
-            if (imageFiles.length > 0) {
-                loadingDiv.style.display = 'none';
-                mainImage.style.display = 'block';
-                statusBar.style.display = 'block';
-                
-                shuffleArray(imageFiles); // 自動隨機打亂
-                displayImage(currentIndex);
-            } else {
-                loadingDiv.textContent = "❌ json 檔內沒有圖片紀錄！";
+        // Fisher-Yates 隨機打亂演算法
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
             }
-        } catch (error) {
-            console.error(error);
-            loadingDiv.textContent = "❌ 讀取清單失敗，請確認 images.json 是否已推送到 GitHub。";
         }
-    }
 
-    loadImagesFromJSON();
+        // 🔥 核心功能：自動預讀取接下來的圖片
+        function preloadNextImages(currentIndex) {
+            if (imageFiles.length <= 1) return;
 
-    // 鍵盤事件
-    window.addEventListener('keydown', function(e) {
-        if (imageFiles.length === 0) return;
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            currentIndex = (currentIndex + 1) % imageFiles.length;
-            displayImage(currentIndex);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            currentIndex = (currentIndex - 1 + imageFiles.length) % imageFiles.length;
-            displayImage(currentIndex);
+            // 清空上一次的預讀取快取，避免佔用過多記憶體
+            preloadContainer.innerHTML = '';
+
+            // 設定要預讀取的數量（這裡設定預先載入後面 2 張圖片）
+            const preloadCount = 2; 
+
+            for (let i = 1; i <= preloadCount; i++) {
+                const nextIndex = (currentIndex + i) % imageFiles.length;
+                
+                // 建立隱藏的 Image 物件投放到快取容器中，強迫瀏覽器提前下載
+                const imgCache = new Image();
+                imgCache.src = imageFiles[nextIndex].url;
+                preloadContainer.appendChild(imgCache);
+            }
         }
-    });
-</script>
+
+        // 顯示圖片
+        function displayImage(index) {
+            if (imageFiles.length === 0) return;
+            
+            const imgData = imageFiles[index];
+            mainImage.src = imgData.url;
+            imgNameSpan.textContent = imgData.name;
+            currentIndexSpan.textContent = index + 1;
+            totalCountSpan.textContent = imageFiles.length;
+
+            // 📢 每次切換完圖片後，立刻觸發背景預讀取
+            preloadNextImages(index);
+        }
+
+        // 讀取 images.json
+        async function loadImagesFromJSON() {
+            try {
+                const response = await fetch('./images.json');
+                if (!response.ok) throw new Error('找不到 images.json 檔案');
+                
+                const filenames = await response.json();
+                
+                imageFiles = filenames.map(name => ({
+                    name: name,
+                    url: `${IMG_DIR}${name}`
+                }));
+
+                if (imageFiles.length > 0) {
+                    loadingDiv.style.display = 'none';
+                    mainImage.style.display = 'block';
+                    statusBar.style.display = 'block';
+                    
+                    shuffleArray(imageFiles); // 自動隨機打亂
+                    displayImage(currentIndex); // 顯示第一張（並觸發預讀取第2, 3張）
+                } else {
+                    loadingDiv.textContent = "❌ json 檔內沒有任何圖片紀錄！";
+                }
+            } catch (error) {
+                console.error(error);
+                loadingDiv.textContent = "❌ 讀取清單失敗，請確認 images.json 的編碼是否為正確的 UTF-8。";
+            }
+        }
+
+        loadImagesFromJSON();
+
+        // 鍵盤事件：上下鍵切換
+        window.addEventListener('keydown', function(e) {
+            if (imageFiles.length === 0) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                currentIndex = (currentIndex + 1) % imageFiles.length;
+                displayImage(currentIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                currentIndex = (currentIndex - 1 + imageFiles.length) % imageFiles.length;
+                displayImage(currentIndex);
+            }
+        });
+    </script>
 </body>
 </html>
