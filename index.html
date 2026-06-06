@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>全自動隨機圖片播放器</title>
+    <style>
+        body { margin: 0; background: #121212; color: white; display: flex; height: 100vh; justify-content: center; align-items: center; font-family: sans-serif; overflow: hidden; }
+        #main-image { max-width: 100%; max-height: 100%; object-fit: contain; }
+        #status { position: absolute; bottom: 15px; right: 20px; background: rgba(0,0,0,0.8); padding: 6px 14px; border-radius: 20px; font-size: 12px; }
+    </style>
+</head>
+<body>
+
+    <img id="main-image" src="" alt="圖片載入中...">
+    <div id="status"><span id="img-name"></span> (<span id="current">0</span>/<span id="total">0</span>)</div>
+
+    <script>
+        // ⚠️ 【關鍵步驟】因為前端無法自動抓取檔名，你必須在這裡手動把 img 資料夾內的所有檔名列出來
+        const imageNames = [
+            "pic1.jpg",
+            "pic2.png",
+            "pic3.jpg",
+            "photo4.webp"
+            // 有多少張圖片，就依此類推寫在這裡...
+        ];
+
+        // 補全相對路徑 ./img/
+        let imageFiles = imageNames.map(name => ({
+            name: name,
+            url: `./img/${name}`
+        }));
+
+        let currentIndex = 0;
+
+        // Fisher-Yates 隨機打亂
+        for (let i = imageFiles.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [imageFiles[i], imageFiles[j]] = [imageFiles[j], imageFiles[i]];
+        }
+
+        const mainImage = document.getElementById('main-image');
+        const imgNameSpan = document.getElementById('img-name');
+        const currentSpan = document.getElementById('current');
+        const totalSpan = document.getElementById('total');
+
+        function displayImage(index) {
+            if (imageFiles.length === 0) return;
+            const img = imageFiles[index];
+            mainImage.src = img.url;
+            imgNameSpan.textContent = img.name;
+            currentSpan.textContent = index + 1;
+            totalSpan.textContent = imageFiles.length;
+        }
+
+        // 初始化顯示
+        if(imageFiles.length > 0) {
+            displayImage(currentIndex);
+        } else {
+            imgNameSpan.textContent = "請先在原始碼中填寫圖片檔案清單！";
+        }
+
+        // 鍵盤切換
+        window.addEventListener('keydown', function(e) {
+            if (imageFiles.length === 0) return;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                currentIndex = (currentIndex + 1) % imageFiles.length;
+                displayImage(currentIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                currentIndex = (currentIndex - 1 + imageFiles.length) % imageFiles.length;
+                displayImage(currentIndex);
+            }
+        });
+    </script>
+</body>
+</html>
