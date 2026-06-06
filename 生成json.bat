@@ -1,0 +1,1 @@
+python -c "import os, json; exts=('.jpg','.jpeg','.png','.gif','.webp'); print(json.dumps([f for f in os.listdir('./img') if f.lower().endswith(exts)]))" | Out-File -Encoding utf8 images.json
