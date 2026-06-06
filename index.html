@@ -40,109 +40,78 @@
         </div>
     </div>
 
-    <script>
-        const IMG_DIR = './img/';
-        // 支援的圖片副檔名格式
-        const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'];
-        
-        let imageFiles = [];
-        let currentIndex = 0;
+<script>
+    const IMG_DIR = './img/';
+    let imageFiles = [];
+    let currentIndex = 0;
 
-        const mainImage = document.getElementById('main-image');
-        const imgNameSpan = document.getElementById('img-name');
-        const currentIndexSpan = document.getElementById('current-index');
-        const totalCountSpan = document.getElementById('total-count');
-        const loadingDiv = document.getElementById('loading');
-        const statusBar = document.getElementById('status-bar');
+    const mainImage = document.getElementById('main-image');
+    const imgNameSpan = document.getElementById('img-name');
+    const currentIndexSpan = document.getElementById('current-index');
+    const totalCountSpan = document.getElementById('total-count');
+    const loadingDiv = document.getElementById('loading');
+    const statusBar = document.getElementById('status-bar');
 
-        // Fisher-Yates 隨機打亂演算法
-        function shuffleArray(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
         }
+    }
 
-        // 顯示圖片
-        function displayImage(index) {
-            if (imageFiles.length === 0) return;
-            const imgData = imageFiles[index];
-            mainImage.src = imgData.url;
-            imgNameSpan.textContent = imgData.name;
-            currentIndexSpan.textContent = index + 1;
-            totalCountSpan.textContent = imageFiles.length;
-        }
+    function displayImage(index) {
+        if (imageFiles.length === 0) return;
+        const imgData = imageFiles[index];
+        mainImage.src = imgData.url;
+        imgNameSpan.textContent = imgData.name;
+        currentIndexSpan.textContent = index + 1;
+        totalCountSpan.textContent = imageFiles.length;
+    }
 
-        // 🔥 核心魔法：全自動抓取本地/GitHub Pages 資料夾內的檔案清單
-        async function autoLoadImages() {
-            try {
-                // 發出請求讀取資料夾目錄網頁
-                const response = await fetch(IMG_DIR);
-                const text = await response.text();
+    // 🔥 改成讀取剛剛生成的 images.json，這在 GitHub Pages 上 100% 合法且不會 404
+    async function loadImagesFromJSON() {
+        try {
+            const response = await fetch('./images.json');
+            if (!response.ok) throw new Error('找不到 images.json 檔案');
+            
+            const filenames = await response.json();
+            
+            imageFiles = filenames.map(name => ({
+                name: name,
+                url: `${IMG_DIR}${name}`
+            }));
+
+            if (imageFiles.length > 0) {
+                loadingDiv.style.display = 'none';
+                mainImage.style.display = 'block';
+                statusBar.style.display = 'block';
                 
-                // 建立一個虛擬的 HTML 解析器來讀取網頁內容
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(text, 'text/html');
-                
-                // 找出所有的超連結 (<a> 標籤)
-                const links = doc.querySelectorAll('a');
-                const filenames = [];
-
-                links.forEach(link => {
-                    const href = link.getAttribute('href');
-                    if (!href) return;
-                    
-                    // 解碼 URL（避免中文檔名變亂碼）並純化檔名
-                    const decodedHref = decodeURIComponent(href);
-                    const filename = decodedHref.split('/').pop();
-                    
-                    // 檢查副檔名是否為圖片
-                    const ext = filename.split('.').pop().toLowerCase();
-                    if (validExtensions.includes(ext) && !filenames.includes(filename)) {
-                        filenames.push(filename);
-                    }
-                });
-
-                // 將檔名轉換為專案所需的物件結構
-                imageFiles = filenames.map(name => ({
-                    name: name,
-                    url: `${IMG_DIR}${name}`
-                }));
-
-                if (imageFiles.length > 0) {
-                    loadingDiv.style.display = 'none';
-                    mainImage.style.display = 'block';
-                    statusBar.style.display = 'block';
-                    
-                    shuffleArray(imageFiles); // 自動隨機打亂
-                    displayImage(currentIndex);
-                } else {
-                    loadingDiv.textContent = "❌ 找不到圖片！請確認 img 資料夾內是否有圖片，且已 push 到 GitHub。";
-                }
-
-            } catch (error) {
-                console.error("讀取資料夾失敗:", error);
-                loadingDiv.textContent = "❌ 無法自動讀取資料夾。請確保已部署至 GitHub Pages 上執行。";
+                shuffleArray(imageFiles); // 自動隨機打亂
+                displayImage(currentIndex);
+            } else {
+                loadingDiv.textContent = "❌ json 檔內沒有圖片紀錄！";
             }
+        } catch (error) {
+            console.error(error);
+            loadingDiv.textContent = "❌ 讀取清單失敗，請確認 images.json 是否已推送到 GitHub。";
         }
+    }
 
-        // 啟動自動載入
-        autoLoadImages();
+    loadImagesFromJSON();
 
-        // 鍵盤事件監聽
-        window.addEventListener('keydown', function(e) {
-            if (imageFiles.length === 0) return;
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                currentIndex = (currentIndex + 1) % imageFiles.length;
-                displayImage(currentIndex);
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                currentIndex = (currentIndex - 1 + imageFiles.length) % imageFiles.length;
-                displayImage(currentIndex);
-            }
-        });
-    </script>
+    // 鍵盤事件
+    window.addEventListener('keydown', function(e) {
+        if (imageFiles.length === 0) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            currentIndex = (currentIndex + 1) % imageFiles.length;
+            displayImage(currentIndex);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            currentIndex = (currentIndex - 1 + imageFiles.length) % imageFiles.length;
+            displayImage(currentIndex);
+        }
+    });
+</script>
 </body>
 </html>
