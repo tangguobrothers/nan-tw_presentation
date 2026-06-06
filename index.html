@@ -40,11 +40,6 @@
     <div id="viewer">
         <div id="loading">正在自動載入圖片清單...</div>
         <img id="main-image" src="" alt="圖片載入中...">
-        
-        <div id="status-bar" style="display: none;">
-            <span id="img-name">載入中...</span>
-            <span id="counter"><span id="current-index">0</span> / <span id="total-count">0</span></span>
-        </div>
     </div>
 
     <div id="preload-container"></div>
@@ -142,11 +137,11 @@
                 e.preventDefault();
                 currentIndex = (currentIndex + 1) % imageFiles.length;
                 displayImage(currentIndex);
-            } else if (e.key === 'ArrowUp') {
+            }/* else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 currentIndex = (currentIndex - 1 + imageFiles.length) % imageFiles.length;
                 displayImage(currentIndex);
-            }
+            }*/
         });
     </script>
 </body>
